@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Entropía de Shannon RGB</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Courier New', monospace;
+      background: linear-gradient(270deg, #ff00ff, #00ffff, #00ff00, #ff0000);
+      background-size: 800% 800%;
+      animation: gradientMove 15s ease infinite;
+      color: white;
+    }
+
+    @keyframes gradientMove {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .neon-title {
+      font-size: 2rem;
+      text-align: center;
+      font-weight: bold;
+      text-shadow: 0 0 10px #0ff, 0 0 20px #0ff, 0 0 40px #0ff;
+      animation: pulseGlow 2s infinite alternate;
+    }
+
+    @keyframes pulseGlow {
+      from {
+        text-shadow: 0 0 5px #0ff, 0 0 10px #0ff;
+      }
+      to {
+        text-shadow: 0 0 20px #ff0, 0 0 40px #f0f;
+      }
+    }
+
+    .neon-button {
+      background: linear-gradient(90deg, #00f0ff, #ff00ff, #00ff00);
+      background-size: 300%;
+      color: black;
+      font-weight: bold;
+      padding: 12px 24px;
+      border-radius: 10px;
+      animation: gradientPulse 5s ease infinite;
+      transition: transform 0.2s;
+    }
+
+    .neon-button:hover {
+      transform: scale(1.05);
+    }
+
+    @keyframes gradientPulse {
+      0% { background-position: 0%; }
+      50% { background-position: 100%; }
+      100% { background-position: 0%; }
+    }
+
+    .file-label {
+      background-color: rgba(0, 0, 0, 0.3);
+      border: 2px dashed #0ff;
+      padding: 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: bold;
+      text-align: center;
+      color: #0ff;
+      transition: background 0.3s;
+    }
+
+    .file-label:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .file-input {
+      display: none;
+    }
+  </style>
+</head>
+<body class="p-4">
+  <div class="max-w-2xl mx-auto backdrop-blur-md bg-black/50 p-6 rounded-xl shadow-2xl">
+    <h1 class="neon-title mb-6">🧠 Entropía de Shannon</h1>
+
+    <textarea id="textInput"
+      class="w-full h-32 sm:h-40 p-4 bg-[#0f1122] text-white rounded-lg border border-cyan-400 resize-y mb-4 text-sm sm:text-base"
+      placeholder="Escribe o pega tu texto..."></textarea>
+
+    <label for="fileInput" class="file-label mb-2 block text-sm sm:text-base">📁 Seleccionar archivo</label>
+    <input type="file" id="fileInput" class="file-input" accept=".txt,.pdf">
+    <div id="fileName" class="text-xs sm:text-sm text-cyan-200 mb-4">Ningún archivo seleccionado</div>
+
+    <button onclick="analyzeText()" class="neon-button w-full text-sm sm:text-base mb-6">✨ Calcular Entropía</button>
+
+    <div id="entropyDisplay"
+      class="bg-black/60 border border-cyan-500 rounded-lg p-4 text-cyan-100 whitespace-pre-wrap text-sm sm:text-base">
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <script>
+    function cleanAndTokenize(text) {
+      return text.toLowerCase().replace(/[^a-z0-9]/gi, "").split("");
+    }
+
+    function calculateFrequencies(tokens) {
+      const frequencies = {};
+      tokens.forEach(char => {
+        frequencies[char] = (frequencies[char] || 0) + 1;
+      });
+      const total = tokens.length;
+      const percentages = {};
+      for (let char in frequencies) {
+        percentages[char] = frequencies[char] / total;
+      }
+      return { frequencies, percentages };
+    }
+
+    function calculateEntropy(percentages) {
+      let entropy = 0;
+      for (let char in percentages) {
+        const p = percentages[char];
+        entropy -= p * Math.log2(p);
+      }
+      return entropy;
+    }
+
+    function displayResults(frequencies, percentages, entropy) {
+      const output = [];
+      output.push(`🔹 Entropía Total: ${entropy.toFixed(4)} bits`);
+      output.push(`🔹 Caracteres únicos: ${Object.keys(frequencies).length}`);
+      output.push(`\n📊 Detalle por carácter:`);
+      for (let char in percentages) {
+        output.push(`${char}: ${(percentages[char] * 100).toFixed(2)}% (${frequencies[char]} veces)`);
+      }
+      document.getElementById("entropyDisplay").innerText = output.join('\n');
+    }
+
+    async function extractTextFromPDF(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = "";
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        fullText += content.items.map(item => item.str).join(" ");
+      }
+      return fullText;
+    }
+
+    async function analyzeText() {
+      let text = document.getElementById("textInput").value;
+      const file = document.getElementById("fileInput").files[0];
+      if (!text && file) {
+        if (file.type === "application/pdf") {
+          text = await extractTextFromPDF(file);
+        } else if (file.type === "text/plain") {
+          text = await file.text();
+        }
+      }
+      if (!text) {
+        alert("Por favor, ingresa texto o selecciona un archivo.");
+        return;
+      }
+
+      const tokens = cleanAndTokenize(text);
+      const { frequencies, percentages } = calculateFrequencies(tokens);
+      const entropy = calculateEntropy(percentages);
+      displayResults(frequencies, percentages, entropy);
+    }
+
+    document.getElementById("fileInput").addEventListener("change", function () {
+      const fileName = this.files.length > 0 ? this.files[0].name : "Ningún archivo seleccionado";
+      document.getElementById("fileName").textContent = fileName;
+    });
+  </script>
+</body>
+</html>
