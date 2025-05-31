@@ -1,2 +1,2 @@
 # entropia-
-work entropoa
+work school
